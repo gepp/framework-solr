@@ -4,8 +4,8 @@
 2.将复杂的solr的查询语法简化,封装成不同的方法，浅显易懂，例如<br/>
 	andLike,orLike,andEquals,orEquals,andNotEquals,orNotEquals,andDateLessThan,andDateLessThanOrEqualTo
 	等几十种方法<br/>
-3.实现crud,分页<br/>
-  支持Map 和 bean,添加注解即可指定需要的字段让solr进行分析<br/>
+3.实现crud,分页，排序，返回固定行数<br/>
+  支持Map 和 bean,添加注解即可指定需要的字段让solr进行Analyzer<br/>
 4.暂时支持ik分词<br/>
 
 三.使用
