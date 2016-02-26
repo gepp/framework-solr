@@ -13,10 +13,23 @@
 		<property name="serverUrl" value="http://localhost:8081/solr/good">	<br/>
 		</property><br/>
  	</bean><br/>
+ 	 
  	 BeanFactory factory = new ClassPathXmlApplicationContext("applicationContext.xml");<br/>
    SolrClient solrClient = factory.getBean(SolrClient.class);<br/>
-   solrClient.deleteByKey("id", 10 + "");<br/>
-  
+   SolrKit kit=new SolrKit().addHighlightField("productName").addHighlightField("id") <br/>
+   							.addSortField("id",SolrContants.SORT_DESC)<br/>
+                .andLike("productName", "电信玫瑰", String.class).setRows(4);<br/>
+   //上面kit实现了productName与id的高亮，按照id 倒排序， productName like 电信玫瑰 ，返回结果为4条<br/>
+   //高亮可以通过setHighlightPre和setHighlightPost 来实现 <br/>
+   //返回List<Map><br/>
+   List<Map<String,Object>> productList = solrClient.queryForObjectList(kit);<br/>
+   //返回List<Project><br/>
+   List<Product> productList = solrClient.queryForObjectList(kit, Product.class);<br/>
+   //返回分页
+   public Page queryForPageList(SolrKit kit, Page page)<br/>
+   //返回bean 分页
+   public <T> Page queryForPageList(SolrKit kit, Page page, Class<T> clazz)<br/>
+ 
   solr安装分2种<br/>
   1.直接运行 java -jar start.jar<br/>
   2.使用tomcat等容器部署<br/>

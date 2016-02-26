@@ -98,6 +98,8 @@ public interface SolrClient {
      */
     public List<Map<String, Object>> queryForObjectList(SolrKit kit);
 
+    public List<Map<String, Object>> queryForObjectList(SolrKit kit, int rows);
+
     public Page queryForPageList(SolrKit kit, Page page);
 
     public <T> Page queryForPageList(SolrKit kit, Page page, Class<T> clazz);

@@ -1,5 +1,6 @@
 package com.jdk2010.framework.solr.client.support;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -10,9 +11,7 @@ import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.HttpSolrServer;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.client.solrj.response.UpdateResponse;
-import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.SolrInputField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -21,7 +20,6 @@ import org.springframework.dao.DataAccessException;
 import com.jdk2010.framework.solr.client.SolrClient;
 import com.jdk2010.framework.solr.util.Page;
 import com.jdk2010.framework.solr.util.SolrKit;
-import com.jdk2010.framework.test.Product;
 
 public class DefaultSolrClient implements SolrClient, InitializingBean {
 
@@ -54,11 +52,6 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
         boolean status = true;
         try {
             SolrInputDocument doc = SolrKit.transformBean2SolrDocument(bean);
-            logger.debug("doc:"+doc);
-            for (String key : doc.keySet()) {
-                SolrInputField field = doc.get(key);
-                System.out.println(field.getValue().getClass());
-            }
             if (!doc.isEmpty()) {
                 UpdateResponse response = server.add(doc);
                 server.commit();
@@ -97,7 +90,7 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
         boolean status = true;
         try {
             SolrInputDocument doc = SolrKit.transformMap2SolrDocument(map);
-            logger.debug("doc:"+doc);
+            logger.debug("doc:" + doc);
             if (!doc.isEmpty()) {
                 UpdateResponse response = server.add(doc);
                 server.commit();
@@ -216,6 +209,20 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
     }
 
     @Override
+    public <T> List<T> queryForObjectList(SolrKit kit, Class<T> clazz) {
+        SolrQuery solrQuery = kit.handleQuery();
+        QueryResponse response = null;
+        List<T> list = null;
+        try {
+            response = server.query(solrQuery);
+            list = SolrKit.solrDocumentList2Bean(response, clazz, kit);
+        } catch (SolrServerException e) {
+            throwException(e);
+        }
+        return list;
+    }
+
+    @Override
     public <T> T queryForObject(SolrKit kit, Class<T> clazz) {
         List<T> list = queryForObjectList(kit, clazz);
         if (list != null && list.size() > 0) {
@@ -223,21 +230,6 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
         } else {
             return null;
         }
-    }
-
-    @Override
-    public <T> List<T> queryForObjectList(SolrKit kit, Class<T> clazz) {
-        SolrQuery params = kit.handleQuery();
-        QueryResponse response = null;
-        List<T> list = null;
-        try {
-            response = server.query(params);
-            SolrDocumentList docList = response.getResults();
-            list = SolrKit.solrDocumentList2Bean(docList, clazz);
-        } catch (SolrServerException e) {
-            throwException(e);
-        }
-        return list;
     }
 
     @Override
@@ -252,13 +244,12 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
 
     @Override
     public List<Map<String, Object>> queryForObjectList(SolrKit kit) {
-        SolrQuery params = kit.handleQuery();
+        SolrQuery solrQuery = kit.handleQuery();
         QueryResponse response = null;
-        List<Map<String,Object>> list = null;
+        List<Map<String, Object>> list = null;
         try {
-            response = server.query(params);
-            SolrDocumentList docList = response.getResults();
-            list = SolrKit.solrDocumentList2MapList(docList);
+            response = server.query(solrQuery);
+            list = SolrKit.solrDocumentList2MapList(response, kit);
         } catch (SolrServerException e) {
             throwException(e);
         }
@@ -266,54 +257,53 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
     }
 
     @Override
+    public List<Map<String, Object>> queryForObjectList(SolrKit kit, int rows) {
+        kit.setRows(rows);
+        return queryForObjectList(kit);
+    }
+
+    @Override
     public Page queryForPageList(SolrKit kit, Page page) {
         List<Map<String, Object>> results = null;
-        Page resultPage = null;
-        // SolrQuery params = kit.handleQuery();
-        // params.set("start", (page.getPageIndex() - 1) * page.getPageSize());
-        // params.set("rows", page.getPageSize());
-        // if (StringUtils.isNotBlank(page.getSort())) {
-        // params.set("sort", page.getSort());
-        // }
-        // QueryResponse response = null;
-        // try {
-        // logger.info("SolyQuery WithPage:" + params.toString());
-        // response = server.query(params);
-        // results = transformSolrDocumentList2List(response.getResults());
-        // resultPage = new Page();
-        // page.setPageIndex(page.getPageIndex());
-        // page.setTotalCount(response.getResults().size());
-        // page.setList(results);
-        // } catch (SolrServerException e) {
-        // logger.error("SolrServerException", e);
-        // }
+        SolrQuery params = kit.handleQuery();
+        params.set("start", (page.getPageIndex() - 1) * page.getPageSize());
+        params.set("rows", page.getPageSize());
+        QueryResponse response = null;
+        try {
+            response = server.query(params);
+            results = SolrKit.solrDocumentList2MapList(response, kit);
+            page.setTotalCount(response.getResults().getNumFound());
+            page.setList(results);
+        } catch (SolrServerException e) {
+            results = new ArrayList<Map<String, Object>>();
+            page.setTotalCount(0);
+            page.setList(results);
+            logger.error("SolrServerException", e);
+        }
 
-        return resultPage;
+        return page;
     }
 
     @Override
     public <T> Page queryForPageList(SolrKit kit, Page page, Class<T> clazz) {
         List<T> results = null;
-        Page resultPage = null;
-        SolrQuery params = kit.handleQuery();
-        params.set("start", (page.getPageIndex() - 1) * page.getPageSize());
-        params.set("rows", page.getPageSize());
-        if (StringUtils.isNotBlank(page.getSort())) {
-            params.set("sort", page.getSort());
-        }
+        SolrQuery solrQuery = kit.handleQuery();
+        solrQuery.set("start", (page.getPageIndex() - 1) * page.getPageSize());
+        solrQuery.set("rows", page.getPageSize());
         QueryResponse response = null;
         try {
-            response = server.query(params);
-            results = (List<T>) response.getBeans(clazz);
-            resultPage = new Page();
-            page.setPageIndex(page.getPageIndex());
-            page.setTotalCount(response.getResults().size());
+            response = server.query(solrQuery);
+            results = SolrKit.solrDocumentList2Bean(response, clazz, kit);
+            page.setTotalCount(response.getResults().getNumFound());
             page.setList(results);
         } catch (SolrServerException e) {
+            results = new ArrayList<T>();
+            page.setTotalCount(0);
+            page.setList(results);
             logger.error("SolrServerException", e);
         }
 
-        return resultPage;
+        return page;
     }
 
     protected void throwException(Exception e) {
@@ -333,7 +323,6 @@ public class DefaultSolrClient implements SolrClient, InitializingBean {
             throw new RuntimeException("请配置solr服务器地址！");
         }
         server = new HttpSolrServer(serverUrl);
-        // server.ping();
         if (server == null) {
             throw new RuntimeException("无法连接solr服务器！");
         }

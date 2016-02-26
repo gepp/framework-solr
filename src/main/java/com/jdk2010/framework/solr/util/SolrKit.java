@@ -15,6 +15,8 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrQuery.ORDER;
+import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
@@ -30,8 +32,136 @@ public class SolrKit {
 
     private static final Logger logger = LoggerFactory.getLogger(SolrKit.class);
 
+    private int rows;
+
+    // ***********高亮参数****************
+    private boolean highlight;
+    private String highlightPre; // 前缀
+    private String highlightPost; // 后缀
+    private List<String> highlightFieldList; // 高亮字符串
+    private int highlightFragsize; // 返回的字符个数
+    // ***********高亮参数****************
+
+    // 排序参数
+
+    private List<Map<String, Object>> sortList; // 排序 key 是字段名称 值是asc 或者desc
+
+    public boolean getHighlight() {
+        return highlight;
+    }
+
+    public SolrKit setHighlight(boolean highlight) {
+        this.highlight = highlight;
+        return this;
+    }
+
+    public SolrKit addHighlightField(String fieldName) {
+        if (StringUtils.isBlank(fieldName)) {
+            throw new RuntimeException("搜索字段不能为空！");
+        }
+        if (!highlightFieldList.contains(fieldName)) {
+            if (!fieldName.equals(SolrContants.DEFAULT_PK)) {
+                highlightFieldList.add(fieldName + SolrContants.STRING_SUFFIX);
+            } else {
+                highlightFieldList.add(fieldName);
+            }
+
+        }
+        return this;
+    }
+
+    public SolrKit addSortField(String fieldName, ORDER orderType) {
+        if (StringUtils.isBlank(fieldName) || orderType == null) {
+            throw new RuntimeException("排序字段或者排序类型不能为空！");
+        }
+        Map<String, Object> map = new HashMap<String, Object>();
+        if (!fieldName.equals(SolrContants.DEFAULT_PK)) {
+            map.put(SolrContants.SORT_MAP_KEY_NAME, fieldName + SolrContants.STRING_SUFFIX);
+        } else {
+            map.put(SolrContants.SORT_MAP_KEY_NAME, fieldName);
+        }
+        map.put(SolrContants.SORT_MAP_KEY_VALUE, orderType);
+        map.put(fieldName + SolrContants.STRING_SUFFIX, orderType);
+        if (!sortList.contains(map)) {
+            sortList.add(map);
+        }
+        return this;
+    }
+
+    @SuppressWarnings("rawtypes")
+    public SolrKit addHighlightField(String fieldName, Class clazz) {
+        String newFieldName = SolrKit.getFieldNameByClass(fieldName, clazz);
+        highlightFieldList.add(newFieldName);
+        return this;
+    }
+
+    public String getHighlightPre() {
+        return highlightPre;
+    }
+
+    public SolrKit setHighlightPre(String highlightPre) {
+        this.highlightPre = highlightPre;
+        return this;
+    }
+
+    public String getHighlightPost() {
+        return highlightPost;
+    }
+
+    public SolrKit setHighlightPost(String highlightPost) {
+        this.highlightPost = highlightPost;
+        return this;
+    }
+
+    public List<String> getHighlightFieldList() {
+        return highlightFieldList;
+    }
+
+    public SolrKit setHighlightFieldList(List<String> highlightFieldList) {
+        this.highlightFieldList = highlightFieldList;
+        return this;
+    }
+
+    public int getHighlightFragsize() {
+        return highlightFragsize;
+    }
+
+    public SolrKit setHighlightFragsize(int highlightFragsize) {
+        this.highlightFragsize = highlightFragsize;
+        return this;
+    }
+
+    public int getRows() {
+        return rows;
+    }
+
+    public SolrKit setRows(int rows) {
+        this.rows = rows;
+        return this;
+    }
+
     public SolrKit() {
-        queryString = new StringBuffer();
+        this.queryString = new StringBuffer();
+        this.highlight = false;
+        this.rows = 0;
+        this.highlightPre = "<font color=\"red\">";
+        this.highlightPost = "</font>";
+        this.highlightFragsize = 120;
+        this.highlightFieldList = new ArrayList<String>();
+        this.sortList = new ArrayList<Map<String, Object>>();
+    }
+
+    public SolrKit(String highLightFieldName, boolean highlight) {
+        this();
+        this.highlight = true;
+        this.highlightFieldList.add(highLightFieldName + SolrContants.STRING_SUFFIX);
+    }
+
+    public SolrKit(String highLightFieldName, Class clazz) {
+        this();
+        this.highlight = true;
+        String newFieldName = SolrKit.getFieldNameByClass(highLightFieldName, clazz);
+        this.highlightFieldList.add(newFieldName);
     }
 
     private String formatUTCString(Date d) {
@@ -332,6 +462,31 @@ public class SolrKit {
         }
 
         params.set("q", qryFinalStr);
+
+        if (getHighlight()) {
+            params.setHighlight(true); // 设置高亮显示
+            // 设置高亮显示字段
+            for (String fieldName : getHighlightFieldList()) {
+                params.addHighlightField(fieldName);
+            }
+            // 设置前缀
+            params.setHighlightSimplePre(getHighlightPre());
+            // 设置后缀
+            params.setHighlightSimplePost(getHighlightPost());
+            // 返回的字符个数
+            params.setHighlightFragsize(120);
+        }
+        if (getRows() != 0) {
+            params.setRows(getRows());
+        }
+
+        if (getSortList() != null && getSortList().size() > 0) {
+            for (Map<String, Object> map : getSortList()) {
+                params.addSort(map.get(SolrContants.SORT_MAP_KEY_NAME).toString(),
+                        (ORDER) map.get(SolrContants.SORT_MAP_KEY_VALUE));
+            }
+        }
+
         return params;
     }
 
@@ -355,14 +510,14 @@ public class SolrKit {
     }
 
     /**
-     *  map与SolrInputDocument转换
+     * map与SolrInputDocument转换
      * 
      * @param entity
      * @return
      */
-    public static SolrInputDocument transformMap2SolrDocument(Map<String,Object> map) {
+    public static SolrInputDocument transformMap2SolrDocument(Map<String, Object> map) {
         SolrInputDocument doc = new SolrInputDocument();
-        for (String key :map.keySet()) {
+        for (String key : map.keySet()) {
             Object returnObj = map.get(key);
             if (returnObj != null && !"".equals(returnObj)) {
                 String fieldNameNew = getFieldNameByClass(key, returnObj.getClass());
@@ -371,7 +526,7 @@ public class SolrKit {
         }
         return doc;
     }
-    
+
     /**
      * 实体 list 类与SolrInputDocument list转换
      * 
@@ -388,14 +543,14 @@ public class SolrKit {
         }
         return inputDocumentList;
     }
-    
+
     /**
-     *  map  list 类与SolrInputDocument list转换
+     * map list 类与SolrInputDocument list转换
      * 
      * @param entity
      * @return
      */
-    public static List<SolrInputDocument> transformMapList2SolrDocumentList(List<Map<String,Object>> list) {
+    public static List<SolrInputDocument> transformMapList2SolrDocumentList(List<Map<String, Object>> list) {
         List<SolrInputDocument> inputDocumentList = new ArrayList<SolrInputDocument>();
         SolrInputDocument doc = null;
         for (Map<String, Object> obj : list) {
@@ -405,7 +560,6 @@ public class SolrKit {
         }
         return inputDocumentList;
     }
-    
 
     /**
      * document 转换成实体
@@ -414,7 +568,7 @@ public class SolrKit {
      * @param clzz
      * @return
      */
-    public static <T> T solrDocument2Bean(SolrDocument doc, Class<T> clazz) {
+    public static <T> T solrDocument2Bean(SolrDocument doc, Class<T> clazz, SolrKit kit) {
         if (doc != null) {
             Object obj = null;
             try {
@@ -423,7 +577,7 @@ public class SolrKit {
                 for (String key : doc.keySet()) {
                     docValue = doc.get(key);
                     key = getOriginalBeanPropertyName(key, docValue.getClass());
-                    if (ReflactKit.getAllSolrFields(clazz).contains(key)) { //剔除没有用solrField注解的field
+                    if (ReflactKit.getAllSolrFields(clazz).contains(key)) { // 剔除没有用solrField注解的field
                         ReflactKit.setPropertieValue(key, obj, docValue);
                     }
                 }
@@ -435,8 +589,7 @@ public class SolrKit {
             return null;
         }
     }
-    
-    
+
     /**
      * document 转换成map
      * 
@@ -444,9 +597,9 @@ public class SolrKit {
      * @param clzz
      * @return
      */
-    public static Map<String,Object> solrDocument2Map(SolrDocument doc) {
+    public static Map<String, Object> solrDocument2Map(SolrDocument doc, SolrKit kit) {
         if (doc != null) {
-            Map<String,Object> map = new HashMap<String, Object>();
+            Map<String, Object> map = new HashMap<String, Object>();
             try {
                 Object docValue = null;
                 for (String key : doc.keySet()) {
@@ -470,12 +623,30 @@ public class SolrKit {
      * @param clzz
      * @return
      */
-    public static <T> List<T> solrDocumentList2Bean(SolrDocumentList list, Class<T> clazz) {
+    public static <T> List<T> solrDocumentList2Bean(QueryResponse response, Class<T> clazz, SolrKit kit) {
+        SolrDocumentList list = response.getResults();
         List<T> returnList = new ArrayList<T>();
+        // 这边进行是否高亮判断，替换
+        Map<String, Map<String, List<String>>> highlightMap = response.getHighlighting();
+        if (kit.getHighlight()) {
+            if (highlightMap != null) {
+                for (SolrDocument doc : list) {
+                    Map<String, List<String>> docMap = highlightMap.get(doc.getFieldValue(SolrContants.DEFAULT_PK)
+                            .toString());
+                    if (docMap != null) {
+                        for (String fieldName : kit.getHighlightFieldList()) {
+                            if (docMap.get(fieldName) != null && docMap.get(fieldName).size() != 0) {
+                                doc.setField(fieldName, docMap.get(fieldName).get(0));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if (list != null) {
             Object obj = null;
             for (SolrDocument doc : list) {
-                obj = solrDocument2Bean(doc, clazz);
+                obj = solrDocument2Bean(doc, clazz, kit);
                 returnList.add((T) obj);
             }
             return returnList;
@@ -483,7 +654,7 @@ public class SolrKit {
             return null;
         }
     }
-    
+
     /**
      * documentList 转换成List<Map>
      * 
@@ -491,12 +662,33 @@ public class SolrKit {
      * @param clzz
      * @return
      */
-    public static List<Map<String, Object>> solrDocumentList2MapList(SolrDocumentList list) {
-        List<Map<String,Object>> returnList = new ArrayList<Map<String,Object>>();
+    public static List<Map<String, Object>> solrDocumentList2MapList(QueryResponse response, SolrKit kit) {
+
+        SolrDocumentList list = response.getResults();
+        // 这边进行是否高亮判断，替换
+        Map<String, Map<String, List<String>>> highlightMap = response.getHighlighting();
+
+        if (kit.getHighlight()) {
+            if (highlightMap != null) {
+                for (SolrDocument doc : list) {
+                    Map<String, List<String>> docMap = highlightMap.get(doc.getFieldValue(SolrContants.DEFAULT_PK)
+                            .toString());
+                    if (docMap != null) {
+                        for (String fieldName : kit.getHighlightFieldList()) {
+                            if (docMap.get(fieldName) != null && docMap.get(fieldName).size() != 0) {
+                                doc.setField(fieldName, docMap.get(fieldName).get(0));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        List<Map<String, Object>> returnList = new ArrayList<Map<String, Object>>();
         if (list != null) {
-            Map<String,Object> map = null;
+            Map<String, Object> map = null;
             for (SolrDocument doc : list) {
-                map = solrDocument2Map(doc);
+                map = solrDocument2Map(doc, kit);
                 returnList.add(map);
             }
             return returnList;
@@ -504,7 +696,6 @@ public class SolrKit {
             return null;
         }
     }
-    
 
     /**
      * 根据class类型获取后缀
@@ -548,7 +739,7 @@ public class SolrKit {
     public static String getOriginalBeanPropertyName(String key, Class clazz) {
         String originalBeanPropertyName = key;
         int keyLength = key.length();
-        if (!key.equalsIgnoreCase("id")&&!key.equalsIgnoreCase("_version_")) {
+        if (!key.equalsIgnoreCase("id") && !key.equalsIgnoreCase("_version_")) {
             if (clazz.isAssignableFrom(Integer.class) || clazz.isAssignableFrom(int.class)) {
                 originalBeanPropertyName = originalBeanPropertyName.substring(0,
                         keyLength - SolrContants.INT_SUFFIX.length());
@@ -591,6 +782,14 @@ public class SolrKit {
     @Override
     public String toString() {
         return queryString.toString();
+    }
+
+    public List<Map<String, Object>> getSortList() {
+        return sortList;
+    }
+
+    public void setSortList(List<Map<String, Object>> sortList) {
+        this.sortList = sortList;
     }
 
     public static void main(String[] args) {
