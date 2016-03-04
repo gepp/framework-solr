@@ -16,7 +16,7 @@
 	default-lazy-init="false">
 	
 	<bean id="solrClient" class="com.jdk2010.framework.solr.client.support.DefaultSolrClient">
-		<property name="serverUrl" value="http://localhost:8081/solr/good">
+		<property name="serverUrl" value="http://10.24.61.59:8080/solr/good">
 		</property>
  	</bean>
  </beans>

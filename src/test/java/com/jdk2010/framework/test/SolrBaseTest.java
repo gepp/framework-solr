@@ -59,13 +59,13 @@ public class SolrBaseTest {
     public void testAddBeans() {
         BeanFactory factory = new ClassPathXmlApplicationContext("applicationContext.xml");
         SolrClient solrClient = factory.getBean(SolrClient.class);
-        for (int i = 10; i < 15; i++) {
+        for (int i = 15; i < 20; i++) {
             Product product = new Product();
             product.setId(i);
             product.setBrandId(123);
             product.setIsUp(1);
             product.setPrice(99.99d + new Random().nextDouble());
-            product.setProductName("Apple iPhone 6s 64GB aaa玫瑰金色 移动联通电信" + i + "G手机");
+            product.setProductName("三星手机 答复 苹果" + i + "G手机");
             product.setProductStore(2000);
             product.setStar(100);
             product.setUpTime(new Date());
@@ -79,7 +79,7 @@ public class SolrBaseTest {
     public void testQueryForBeanList() {
         BeanFactory factory = new ClassPathXmlApplicationContext("applicationContext.xml");
         SolrClient solrClient = factory.getBean(SolrClient.class);
-        SolrKit kit=new SolrKit("productName",true).andLike("productName", "移动电信", String.class);
+        SolrKit kit=new SolrKit("productName",true).andLike("productName", "三星", String.class);
         List<Product> productList = solrClient.queryForObjectList(kit, Product.class);
         System.out.println("返回结果：" + productList.size());
         for (Product product : productList) {
@@ -187,9 +187,9 @@ public class SolrBaseTest {
         // test.testDelete(10);
         //test.testDeleteAll();
         // test.testAddBeans();
-//         test.testQueryForBeanList();
+         test.testQueryForBeanList();
         //test.testAddMap();
-        test.testQueryForMapList();
+//        test.testQueryForMapList();
 //        test.testqueryForPageListBean();
 //        test.testqueryForPageListMap();
             
