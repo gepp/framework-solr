@@ -5,9 +5,9 @@
 	andLike,orLike,andEquals,orEquals,andNotEquals,orNotEquals,andDateLessThan,andDateLessThanOrEqualTo
 	等几十种方法<br/>
 3.实现crud,分页，排序，返回固定行数<br/>
-  支持Map 和 bean,添加注解即可指定需要的字段让solr进行Analyzer<br/>
+  支持Map 和 model,添加注解即可指定需要的字段让solr进行Analyzer<br/>
 4.暂时支持ik分词<br/>
-
+5.实现solrcloud crud<br/>
 三.使用
 	<bean id="solrClient" class="com.jdk2010.framework.solr.client.support.DefaultSolrClient"> <br/>
 		<property name="serverUrl" value="http://localhost:8081/solr/good">	<br/>

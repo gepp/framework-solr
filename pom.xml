@@ -5,7 +5,7 @@
 	<version>1.0.0</version>
 	<properties>
 		<spring.version>3.2.9.RELEASE</spring.version>
-		<solrj.version>4.7.1</solrj.version>
+		<solrj.version>4.7.2</solrj.version>
 		<lucene.version>4.7.0</lucene.version>
 		<commons-lang3.version>3.4</commons-lang3.version>
 		<IKAnalyzer.version>1.0.0</IKAnalyzer.version>
@@ -121,6 +121,11 @@
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
 			<version>${commons-lang3.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.jdk2010.framework</groupId>
+			<artifactId>framework-dal</artifactId>
+			<version>1.0.7</version>
 		</dependency>
 	</dependencies>
 </project>
