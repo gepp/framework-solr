@@ -87,8 +87,8 @@
 	<bean id="mySqlDal" class="com.jdk2010.framework.dal.client.support.DefaultDalClient">
 		<property name="dataSource" ref="dataSourceMysql1"></property>
 	</bean>
-	<bean id="solrClient" class="com.jdk2010.framework.solr.client.support.DefaultSolrClient">
-		<property name="serverUrl" value="http://10.24.61.17:8081/solr/good">
-		</property>
+	<bean id="solrClient" class="com.jdk2010.framework.solr.client.support.DefaultSolrCloudClient">
+		<property name="zkHost" value="10.24.61.94:2181,10.24.61.59:2181,10.24.61.161:2181"></property>
+		<property name="coreName" value="good"></property>
 	</bean>
 </beans>

@@ -35,23 +35,64 @@ public class SolrKit {
     private int rows;
 
     // ***********高亮参数****************
-    private boolean highlight;
+    private boolean isHighlight;
     private String highlightPre; // 前缀
     private String highlightPost; // 后缀
     private List<String> highlightFieldList; // 高亮字符串
     private int highlightFragsize; // 返回的字符个数
     // ***********高亮参数****************
-
     // 排序参数
-
     private List<Map<String, Object>> sortList; // 排序 key 是字段名称 值是asc 或者desc
 
-    public boolean getHighlight() {
-        return highlight;
+    // ***********facet参数****************
+    private boolean isFacet;
+    private List<String> facetFieldList; // facet
+
+    // ***********facet参数****************
+
+    public List<String> getFacetFieldList() {
+        return facetFieldList;
     }
 
-    public SolrKit setHighlight(boolean highlight) {
-        this.highlight = highlight;
+    public void setFacetFieldList(List<String> facetFieldList) {
+        this.facetFieldList = facetFieldList;
+    }
+
+    public boolean getHighlight() {
+        return isHighlight;
+    }
+
+    public SolrKit setHighlight(boolean isHighlight) {
+        this.isHighlight = isHighlight;
+        return this;
+    }
+
+    public boolean getFacet() {
+        return isFacet;
+    }
+
+    public SolrKit setFacet(boolean isFacet) {
+        this.isFacet = isFacet;
+        return this;
+    }
+
+    public SolrKit addFacetField(String fieldName) {
+        if (StringUtils.isBlank(fieldName)) {
+            throw new RuntimeException("facet字段不能为空！");
+        }
+        if (!facetFieldList.contains(fieldName)) {
+            if (!fieldName.equals(SolrContants.DEFAULT_PK)) {
+                facetFieldList.add(fieldName + SolrContants.STRING_SUFFIX);
+            } else {
+                facetFieldList.add(fieldName);
+            }
+        }
+        return this;
+    }
+
+    public SolrKit addFacetField(String fieldName, Class clazz) {
+        String newFieldName = SolrKit.getFieldNameByClass(fieldName, clazz);
+        facetFieldList.add(newFieldName);
         return this;
     }
 
@@ -142,7 +183,8 @@ public class SolrKit {
 
     public SolrKit() {
         this.queryString = new StringBuffer();
-        this.highlight = false;
+        this.isHighlight = false;
+        this.isFacet=false;
         this.rows = 0;
         this.highlightPre = "<font color=\"red\">";
         this.highlightPost = "</font>";
@@ -153,13 +195,13 @@ public class SolrKit {
 
     public SolrKit(String highLightFieldName, boolean highlight) {
         this();
-        this.highlight = true;
+        this.isHighlight = true;
         this.highlightFieldList.add(highLightFieldName + SolrContants.STRING_SUFFIX);
     }
 
     public SolrKit(String highLightFieldName, Class clazz) {
         this();
-        this.highlight = true;
+        this.isHighlight = true;
         String newFieldName = SolrKit.getFieldNameByClass(highLightFieldName, clazz);
         this.highlightFieldList.add(newFieldName);
     }
@@ -190,22 +232,13 @@ public class SolrKit {
         return this;
     }
 
+    // 大于
     public SolrKit andGreaterThan(String fieldName, String val) {
         queryString.append(" && ").append(fieldName).append(":[").append(val).append(" TO ").append("*]");
         return this;
     }
 
     public SolrKit orGreaterThan(String fieldName, String val) {
-        queryString.append(" || ").append(fieldName).append(":[").append(val).append(" TO ").append("*]");
-        return this;
-    }
-
-    public SolrKit andGreaterThanOrEqualTo(String fieldName, String val) {
-        queryString.append(" && ").append(fieldName).append(":[").append(val).append(" TO ").append("*]");
-        return this;
-    }
-
-    public SolrKit orGreaterThanOrEqualTo(String fieldName, String val) {
         queryString.append(" || ").append(fieldName).append(":[").append(val).append(" TO ").append("*]");
         return this;
     }
@@ -222,34 +255,12 @@ public class SolrKit {
         return this;
     }
 
-    public SolrKit andDateGreaterThanOrEqualTo(String fieldName, Date val) {
-        queryString.append(" && ").append(fieldName).append(":[").append(formatUTCString(val)).append(" TO ")
-                .append("*]");
-        return this;
-    }
-
-    public SolrKit orDateGreaterThanOrEqualTo(String fieldName, Date val) {
-        queryString.append(" || ").append(fieldName).append(":[").append(formatUTCString(val)).append(" TO ")
-                .append("*]");
-        return this;
-    }
-
     public SolrKit andLessThan(String fieldName, String val) {
         queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ").append(val).append("]");
         return this;
     }
 
     public SolrKit orLessThan(String fieldName, String val) {
-        queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ").append(val).append("]");
-        return this;
-    }
-
-    public SolrKit andLessThanOrEqualTo(String fieldName, String val) {
-        queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ").append(val).append("]");
-        return this;
-    }
-
-    public SolrKit orLessThanOrEqualTo(String fieldName, String val) {
         queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ").append(val).append("]");
         return this;
     }
@@ -261,18 +272,6 @@ public class SolrKit {
     }
 
     public SolrKit orDateLessThan(String fieldName, Date val) {
-        queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ")
-                .append(formatUTCString(val)).append("]");
-        return this;
-    }
-
-    public SolrKit andDateLessThanOrEqualTo(String fieldName, Date val) {
-        queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ")
-                .append(formatUTCString(val)).append("]");
-        return this;
-    }
-
-    public SolrKit orDateLessThanOrEqualTo(String fieldName, Date val) {
         queryString.append(" && ").append(fieldName).append(":[").append("*").append(" TO ")
                 .append(formatUTCString(val)).append("]");
         return this;
@@ -476,6 +475,14 @@ public class SolrKit {
             // 返回的字符个数
             params.setHighlightFragsize(120);
         }
+        if(getFacet()){
+            params.setFacet(true);      // 设置使用facet
+            params.setFacetMinCount(1); // 设置facet最少的统计数量
+            for (String fieldName : getFacetFieldList()) {
+                params.addFacetField(fieldName);
+            }
+        }
+        
         if (getRows() != 0) {
             params.setRows(getRows());
         }
